@@ -47,7 +47,7 @@ impl NetworkInterface {
     }
 
     /// Assigns a specific MAC address to this interface.
-    fn set_mac(&mut self, mac: [u8; 6]) {
+    fn _set_mac(&mut self, mac: [u8; 6]) {
         self.mac = Some(mac)
     }
 }

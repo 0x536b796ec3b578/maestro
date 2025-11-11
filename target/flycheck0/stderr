@@ -1,88 +1,12 @@
-   0.025336061s  INFO prepare_target{force=false package_id=maestroo v0.1.0 (/home/skynox/Repository/maestro) target="maestroo"}: cargo::core::compiler::fingerprint: fingerprint error for maestroo v0.1.0 (/home/skynox/Repository/maestro)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("maestroo", ["lib"], "/home/skynox/Repository/maestro/src/lib.rs", Edition2024) }
-   0.025352281s  INFO prepare_target{force=false package_id=maestroo v0.1.0 (/home/skynox/Repository/maestro) target="maestroo"}: cargo::core::compiler::fingerprint:     err: failed to read `/home/skynox/Repository/maestro/target/debug/.fingerprint/maestroo-4cdca58dfe10d25a/lib-maestroo`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: cargo_util::paths::read_bytes
-   1: cargo_util::paths::read
-   2: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   3: cargo::core::compiler::fingerprint::prepare_target
-   4: cargo::core::compiler::compile
-   5: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   6: cargo::ops::cargo_compile::compile_ws
-   7: cargo::ops::cargo_compile::compile_with_exec
-   8: cargo::ops::cargo_compile::compile
-   9: cargo::commands::check::exec
-  10: <cargo::cli::Exec>::exec
-  11: cargo::main
-  12: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  13: std::rt::lang_start::<()>::{closure#0}
-  14: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/core/src/ops/function.rs:290:21
-  15: std::panicking::catch_unwind::do_call
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/panicking.rs:589:40
-  16: std::panicking::catch_unwind
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/panicking.rs:552:19
-  17: std::panic::catch_unwind
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/panic.rs:359:14
-  18: std::rt::lang_start_internal::{{closure}}
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/rt.rs:175:24
-  19: std::panicking::catch_unwind::do_call
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/panicking.rs:589:40
-  20: std::panicking::catch_unwind
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/panicking.rs:552:19
-  21: std::panic::catch_unwind
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/panic.rs:359:14
-  22: std::rt::lang_start_internal
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/rt.rs:171:5
-  23: main
-  24: <unknown>
-  25: __libc_start_main
-  26: <unknown>
-   0.032367239s  INFO prepare_target{force=false package_id=maestroo v0.1.0 (/home/skynox/Repository/maestro) target="maestroo"}: cargo::core::compiler::fingerprint: fingerprint error for maestroo v0.1.0 (/home/skynox/Repository/maestro)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("maestroo", ["lib"], "/home/skynox/Repository/maestro/src/lib.rs", Edition2024) }
-   0.032378389s  INFO prepare_target{force=false package_id=maestroo v0.1.0 (/home/skynox/Repository/maestro) target="maestroo"}: cargo::core::compiler::fingerprint:     err: failed to read `/home/skynox/Repository/maestro/target/debug/.fingerprint/maestroo-14bec0e026445cef/test-lib-maestroo`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: cargo_util::paths::read_bytes
-   1: cargo_util::paths::read
-   2: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   3: cargo::core::compiler::fingerprint::prepare_target
-   4: cargo::core::compiler::compile
-   5: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   6: cargo::ops::cargo_compile::compile_ws
-   7: cargo::ops::cargo_compile::compile_with_exec
-   8: cargo::ops::cargo_compile::compile
-   9: cargo::commands::check::exec
-  10: <cargo::cli::Exec>::exec
-  11: cargo::main
-  12: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  13: std::rt::lang_start::<()>::{closure#0}
-  14: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/core/src/ops/function.rs:290:21
-  15: std::panicking::catch_unwind::do_call
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/panicking.rs:589:40
-  16: std::panicking::catch_unwind
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/panicking.rs:552:19
-  17: std::panic::catch_unwind
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/panic.rs:359:14
-  18: std::rt::lang_start_internal::{{closure}}
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/rt.rs:175:24
-  19: std::panicking::catch_unwind::do_call
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/panicking.rs:589:40
-  20: std::panicking::catch_unwind
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/panicking.rs:552:19
-  21: std::panic::catch_unwind
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/panic.rs:359:14
-  22: std::rt::lang_start_internal
-             at /rustc/1159e78c4747b02ef996e55082b704c09b970588/library/std/src/rt.rs:171:5
-  23: main
-  24: <unknown>
-  25: __libc_start_main
-  26: <unknown>
-    Checking maestroo v0.1.0 (/home/skynox/Repository/maestro)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.29s
+   0.026500791s  INFO prepare_target{force=false package_id=maestro v0.1.0 (/home/skynox/Repository/maestro) target="maestro"}: cargo::core::compiler::fingerprint: stale: changed "/home/skynox/Repository/maestro/src/network/interface.rs"
+   0.026511041s  INFO prepare_target{force=false package_id=maestro v0.1.0 (/home/skynox/Repository/maestro) target="maestro"}: cargo::core::compiler::fingerprint:           (vs) "/home/skynox/Repository/maestro/target/debug/.fingerprint/maestro-27d1a1c829740ebe/dep-lib-maestro"
+   0.026513421s  INFO prepare_target{force=false package_id=maestro v0.1.0 (/home/skynox/Repository/maestro) target="maestro"}: cargo::core::compiler::fingerprint:                FileTime { seconds: 1762891168, nanos: 994528420 } < FileTime { seconds: 1762891172, nanos: 63528089 }
+   0.026562821s  INFO prepare_target{force=false package_id=maestro v0.1.0 (/home/skynox/Repository/maestro) target="maestro"}: cargo::core::compiler::fingerprint: fingerprint dirty for maestro v0.1.0 (/home/skynox/Repository/maestro)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("maestro", ["lib"], "/home/skynox/Repository/maestro/src/lib.rs", Edition2024) }
+   0.026570231s  INFO prepare_target{force=false package_id=maestro v0.1.0 (/home/skynox/Repository/maestro) target="maestro"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleItem(ChangedFile { reference: "/home/skynox/Repository/maestro/target/debug/.fingerprint/maestro-27d1a1c829740ebe/dep-lib-maestro", reference_mtime: FileTime { seconds: 1762891168, nanos: 994528420 }, stale: "/home/skynox/Repository/maestro/src/network/interface.rs", stale_mtime: FileTime { seconds: 1762891172, nanos: 63528089 } }))
+   0.027595411s  INFO prepare_target{force=false package_id=maestro v0.1.0 (/home/skynox/Repository/maestro) target="maestro"}: cargo::core::compiler::fingerprint: stale: changed "/home/skynox/Repository/maestro/src/network/interface.rs"
+   0.027599511s  INFO prepare_target{force=false package_id=maestro v0.1.0 (/home/skynox/Repository/maestro) target="maestro"}: cargo::core::compiler::fingerprint:           (vs) "/home/skynox/Repository/maestro/target/debug/.fingerprint/maestro-f2384c751b5fe497/dep-test-lib-maestro"
+   0.027602281s  INFO prepare_target{force=false package_id=maestro v0.1.0 (/home/skynox/Repository/maestro) target="maestro"}: cargo::core::compiler::fingerprint:                FileTime { seconds: 1762891168, nanos: 994528420 } < FileTime { seconds: 1762891172, nanos: 63528089 }
+   0.027630621s  INFO prepare_target{force=false package_id=maestro v0.1.0 (/home/skynox/Repository/maestro) target="maestro"}: cargo::core::compiler::fingerprint: fingerprint dirty for maestro v0.1.0 (/home/skynox/Repository/maestro)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("maestro", ["lib"], "/home/skynox/Repository/maestro/src/lib.rs", Edition2024) }
+   0.027636941s  INFO prepare_target{force=false package_id=maestro v0.1.0 (/home/skynox/Repository/maestro) target="maestro"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleItem(ChangedFile { reference: "/home/skynox/Repository/maestro/target/debug/.fingerprint/maestro-f2384c751b5fe497/dep-test-lib-maestro", reference_mtime: FileTime { seconds: 1762891168, nanos: 994528420 }, stale: "/home/skynox/Repository/maestro/src/network/interface.rs", stale_mtime: FileTime { seconds: 1762891172, nanos: 63528089 } }))
+    Checking maestro v0.1.0 (/home/skynox/Repository/maestro)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
