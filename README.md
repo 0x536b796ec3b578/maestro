@@ -109,5 +109,4 @@ If you’d like to support the project:
 
 ---
 
-> `Maestro` - one who conducts.
-> Just like its name, this library orchestrates the networking layer so your application can focus on the melody of your logic.
+> `Maestro` - one who conducts. Just like its name, this library orchestrates the networking layer so your application can focus on the melody of your logic.
