@@ -3,18 +3,18 @@
 
 ## Overview
 
-Maestro is a networking library that lets you build concurrent TCP and UDP servers by implementing just two lightweight traits:
+Maestro is a networking library that enables you to build high-performance concurrent TCP and UDP servers in Rust. By implementing just two lightweight traits, you can focus on your application's core logic while Maestro handles the network orchestration:
 - `TcpHandler`
 - `UdpHandler`
 
 In other words:
-> You write the logic. Maestro conducts the orchestra.
+> You compose the logic. Maestro conducts the orchestra.
 
 ## How It Works
 
-### Implement a handler
+### Implement a Handler
 
-#### TCP
+#### TCP Handler
 ```rust
 struct MyTcpService;
 
@@ -23,22 +23,18 @@ impl TcpHandler for MyTcpService {
     fn name(&self) -> &'static str {
         "My TCP Service"
     }
+    
     fn port(&self) -> u16 {
         8080
     }
 
-    async fn on_connection(
-        &self,
-        stream: TcpStream,
-        peer: &SocketAddr,
-        network_interface: &NetworkInterface,
-    ) {
+    async fn on_connection(&self, stream: TcpStream, peer: &SocketAddr) {
         unimplemented!()
     }
 }
 ```
 
-#### UDP
+#### UDP Handler
 ```rust
 struct MyUdpService;
 
@@ -47,6 +43,7 @@ impl UdpHandler for MyUdpService {
     fn name(&self) -> &'static str {
         "My UDP Service"
     }
+    
     fn port(&self) -> u16 {
         5353
     }
@@ -57,52 +54,52 @@ impl UdpHandler for MyUdpService {
 }
 ```
 
-### Register services into the `Supervisor`
+### Registering Services with the `Supervisor`
 ```rust
 #[tokio::main]
 async fn main() -> Result<()> {
-    let network_interface = NetworkInterface::from_str("eth0")?;
+    let network_interface = NetworkInterface::from_str("lo")?;
     let mut supervisor = Supervisor::new(network_interface);
+    
     supervisor.add(MyUdpService);
     supervisor.add(MyTcpService);
+    
     supervisor.run().await?;
+    
     Ok(())
 }
 ```
 
 ## Installation
 
-### Cargo:
+Run the following Cargo command in your project directory:
+```bash
+cargo add maestro
 ```
-[dependencies]
+
+Or add the following line to your `Cargo.toml`:
+```toml
 maestro = "0.1.0"
 ```
 
-### Or install from source:
-```
-git clone https://github.com/0x536b796ec3b578/maestro
-cd maestro
-cargo build --release
-```
-
 ## Contributing
-Contributions are always welcome!
+We welcome contributions! Here are some good areas to get involved:
+- Optimizing network performance and efficiency
+- Writing benchmark tests to track and validate performance improvements
+- Enhancing documentation for clarity and completeness
+- Ensuring cross-platform compatibility
 
-Good areas to contribute:
-- Performance improvements (avoiding allocations, reducing syscalls)
-- New socket options or advanced tuning knobs
-- More automatic interface detection
-- Additional helper utilities for common protocols
-- Improved diagnostics & tracing integration
-- Cross-platform support for macOS/Windows/BSD
-
-Before submitting a PR, please run cargo fmt and cargo clippy to maintain consistent formatting and lint standards.
+Before submitting a PR, please ensure that your changes are properly formatted by running:
+```bash
+cargo fmt
+cargo clippy
+```
 
 ## Supporting
 
-Author: Skynõx
+Author: *Skynõx*
 
-If you’d like to support the project:
+If you'd like to support the project, you can donate via the following addresses:
 | Bitcoin  | bc1q87r2z8szxwqt538edzw5gl397c9v3hzxwjw82h |
 | :------- | :----------------------------------------- |
 | Ethereum | 0xe277049067F72E89326c2C0D11333531d5BbB78B |
