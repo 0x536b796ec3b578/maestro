@@ -37,12 +37,7 @@ impl TcpHandler for MyTcp {
         8080
     }
 
-    async fn on_connection(
-        &self,
-        mut stream: TcpStream,
-        peer: &SocketAddr,
-        _iface: &NetworkInterface,
-    ) {
+    async fn on_connection(&self, mut stream: TcpStream, peer: &SocketAddr) {
         info!("TCP client connected: {}", peer);
         let mut buf = [0u8; 1024];
 

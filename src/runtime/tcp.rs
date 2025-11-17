@@ -3,7 +3,7 @@ use std::{io::Result, net::SocketAddr, sync::Arc};
 use tokio::net::{TcpListener, TcpStream};
 use tracing::{error, info};
 
-use crate::{NetworkInterface, network::socket::bind::BindMode};
+use crate::network::socket::bind::BindMode;
 
 /// Defines the interface for handling TCP connections.
 ///
@@ -33,12 +33,7 @@ pub trait TcpHandler: Send + Sync + Sized {
     /// - `stream`: The [`TcpStream`] representing the client connection.
     /// - `peer`: The remote socket address of the client.
     /// - `network_interface`: The [`NetworkInterface`] this service is bound to.
-    async fn on_connection(
-        &self,
-        stream: TcpStream,
-        peer: &SocketAddr,
-        network_interface: &NetworkInterface,
-    );
+    async fn on_connection(&self, stream: TcpStream, peer: &SocketAddr);
 }
 
 /// Runs the connection-accept loop for a [`TcpHandler`].
@@ -48,11 +43,7 @@ pub trait TcpHandler: Send + Sync + Sized {
 /// - Accepts incoming connections in a loop.
 /// - Spawns a new asynchronous task for each connection,
 ///   invoking [`TcpHandler::on_connection`].
-pub(crate) async fn run_tcp_service<R>(
-    runtime: Arc<R>,
-    listener: TcpListener,
-    network_interface: Arc<NetworkInterface>,
-) -> Result<()>
+pub(crate) async fn run_tcp_service<R>(runtime: Arc<R>, listener: TcpListener) -> Result<()>
 where
     R: TcpHandler + Send + Sync + Sized + 'static,
 {
@@ -72,12 +63,9 @@ where
         };
 
         let runtime = Arc::clone(&runtime);
-        let network_interface = Arc::clone(&network_interface);
 
         tokio::spawn(async move {
-            runtime
-                .on_connection(stream, &peer, &network_interface)
-                .await;
+            runtime.on_connection(stream, &peer).await;
         });
     }
 }

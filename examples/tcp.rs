@@ -21,12 +21,7 @@ impl TcpHandler for EchoTcp {
         8080
     }
 
-    async fn on_connection(
-        &self,
-        mut stream: TcpStream,
-        peer: &SocketAddr,
-        _iface: &NetworkInterface,
-    ) {
+    async fn on_connection(&self, mut stream: TcpStream, peer: &SocketAddr) {
         info!("New TCP client: {}", peer);
 
         let mut buf = [0u8; 1024];

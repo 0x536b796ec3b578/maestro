@@ -101,12 +101,7 @@ where
     /// Runs the TCP runtime by binding a listener and serving incoming connections.
     async fn serve(&self) -> Result<()> {
         let listener = bind_tcp_listener(self).await?;
-        run_tcp_service(
-            Arc::clone(&self.inner),
-            listener,
-            Arc::clone(&self.network_interface),
-        )
-        .await
+        run_tcp_service(Arc::clone(&self.inner), listener).await
     }
 }
 
