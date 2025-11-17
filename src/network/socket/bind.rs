@@ -2,70 +2,100 @@ use socket2::{Domain, Protocol, Socket, Type};
 use std::{
     io::{Error, ErrorKind, Result},
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    sync::Arc,
 };
 use tokio::net::{TcpListener, UdpSocket};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use crate::{
-    Service,
+    NetworkInterface,
     network::socket::{
         buffer::{tcp_backlog, tcp_recvbuf_size, tcp_sendbuf_size, udp_recvbuf_size},
         multicast::join_multicast_groups,
     },
-    service::BindMode,
+    runtime::Runtime,
 };
 
-/// Computes the list of socket addresses to bind for a service.
+/// Determines how a runtime selects the IP addresses on which it binds sockets.
 ///
-/// - [`BindMode::Specific`] → binds only to the specified address.
-/// - [`BindMode::BindAll`] → binds to both IPv4 and IPv6 unspecified addresses.
-/// - [`BindMode::PreferInterface`] → binds to all IPs assigned to the
-///   service’s [`crate::NetworkInterface`].
+/// The bind strategy affects both TCP and UDP runtimes, and controls which
+/// address(es) are attempted when creating listeners or datagram sockets.
+///
+/// # Variants
+/// - [`BindMode::PreferInterface`] (default)
+///   Use all IP addresses configured on the runtime’s [`NetworkInterface`].
+///
+/// - [`BindMode::BindAll`]
+///   Bind to the unspecified IPv4 and IPv6 wildcard addresses (`0.0.0.0` and `::`).
+///
+/// - [`BindMode::Specific`]
+///   Force binding to a single, explicit IP address.
+#[derive(Debug, Clone)]
+pub enum BindMode {
+    /// Bind to all addresses assigned to the runtime’s network interface.
+    PreferInterface,
+    /// Bind to IPv4 and IPv6 wildcard addresses (`0.0.0.0` and `[::]`).
+    BindAll,
+    /// Bind only to the specified IP address.
+    Specific(IpAddr),
+}
+
+/// Computes the list of socket addresses that a runtime should attempt to bind.
+///
+/// This function expands the [`BindMode`] strategy into one or more concrete
+/// [`SocketAddr`]s. The returned addresses are ordered, and callers attempt them
+/// sequentially until one succeeds.
+///
+/// - [`BindMode::Specific`]: Returns exactly one address.
+/// - [`BindMode::BindAll`]: Returns wildcard IPv4 + IPv6 addresses.
+/// - [`BindMode::PreferInterface`]: Returns all addresses on the
+///   runtime’s [`NetworkInterface`].
 ///
 /// If no IPs are available on the interface, falls back to `0.0.0.0:<port>`.
-pub(crate) fn bind_addresses<S: Service>(service: &S) -> Vec<SocketAddr> {
-    match service.bind_mode() {
-        BindMode::Specific(ip) => vec![SocketAddr::new(ip, service.port())],
+pub(crate) fn bind_addresses<R: Runtime>(runtime: &R) -> Vec<SocketAddr> {
+    match runtime.bind_mode() {
+        BindMode::Specific(ip) => vec![SocketAddr::new(ip, runtime.port())],
         BindMode::BindAll => vec![
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), service.port()),
-            SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), service.port()),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), runtime.port()),
+            SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), runtime.port()),
         ],
         BindMode::PreferInterface => {
-            let network_interface = service.network_interface();
-            let mut addresses =
-                Vec::with_capacity(network_interface.inet.len() + network_interface.inet6.len());
+            let iface = runtime.network_interface();
+            let mut addrs = Vec::with_capacity(iface.inet.len() + iface.inet6.len());
 
-            for ip in &network_interface.inet {
-                addresses.push(SocketAddr::new(IpAddr::V4(*ip), service.port()));
+            for ip in &iface.inet {
+                addrs.push(SocketAddr::new(IpAddr::V4(*ip), runtime.port()));
             }
-            for ip in &network_interface.inet6 {
-                addresses.push(SocketAddr::new(IpAddr::V6(*ip), service.port()));
+            for ip in &iface.inet6 {
+                addrs.push(SocketAddr::new(IpAddr::V6(*ip), runtime.port()));
             }
 
-            if addresses.is_empty() {
+            if addrs.is_empty() {
                 tracing::warn!(
-                    "Interface {} has no IPs. Falling back to '0.0.0.0:{}'.",
-                    network_interface.name,
-                    service.port()
+                    "Interface {} has no IPs, falling back to 0.0.0.0:{}",
+                    iface.name,
+                    runtime.port()
                 );
-                addresses.push(SocketAddr::new(
+                addrs.push(SocketAddr::new(
                     IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-                    service.port(),
+                    runtime.port(),
                 ));
             }
-
-            addresses
+            addrs
         }
     }
 }
 
-/// Binds a single TCP listener for the given service.
+/// Creates and binds a TCP listener for the given runtime.
+///
+/// The runtime’s [`BindMode`] determines the list of addresses to attempt.
+/// The function tries each candidate address in sequence until one succeeds.
 ///
 /// Tries each computed bind address in order until one succeeds.
 /// Configures platform-specific options such as `SO_REUSEADDR` and `SO_REUSEPORT`
 /// (when available).
-pub(crate) async fn bind_tcp_listener<S: Service>(service: &S) -> Result<TcpListener> {
-    for address in bind_addresses(service) {
+pub(crate) async fn bind_tcp_listener<R: Runtime>(runtime: &R) -> Result<TcpListener> {
+    for address in bind_addresses(runtime) {
         let domain = match address {
             SocketAddr::V4(_) => Domain::IPV4,
             SocketAddr::V6(_) => Domain::IPV6,
@@ -76,17 +106,13 @@ pub(crate) async fn bind_tcp_listener<S: Service>(service: &S) -> Result<TcpList
                 socket.set_reuse_address(true)?;
                 #[cfg(target_os = "linux")]
                 socket.set_reuse_port(true)?;
-
                 if address.is_ipv6() {
                     socket.set_only_v6(true)?;
                 }
 
-                #[cfg(target_os = "linux")]
                 if let Some(size) = tcp_recvbuf_size() {
                     socket.set_recv_buffer_size(size)?;
                 }
-
-                #[cfg(target_os = "linux")]
                 if let Some(size) = tcp_sendbuf_size() {
                     socket.set_send_buffer_size(size)?;
                 }
@@ -100,8 +126,7 @@ pub(crate) async fn bind_tcp_listener<S: Service>(service: &S) -> Result<TcpList
                 socket.set_nonblocking(true)?;
 
                 let listener = TcpListener::from_std(socket.into())?;
-                info!("TCP service `{}` bound on {}", service.name(), address);
-
+                info!("TCP runtime `{}` bound on {}", runtime.name(), address);
                 return Ok(listener);
             }
             Err(e) => error!("Failed to create TCP socket for {}: {:?}", address, e),
@@ -110,72 +135,72 @@ pub(crate) async fn bind_tcp_listener<S: Service>(service: &S) -> Result<TcpList
 
     Err(Error::new(
         ErrorKind::AddrNotAvailable,
-        format!(
-            "No valid TCP address could be bound for {}.",
-            service.name()
-        ),
+        "No valid TCP address",
     ))
 }
 
-/// Binds UDP sockets for the given service and joins multicast groups if applicable.
+/// Creates, configures, and binds UDP sockets for a runtime.
 ///
-/// For each valid bind address:
-/// - Configures socket options such as `SO_REUSEADDR`, `SO_BROADCAST`, and `SO_REUSEPORT` (Linux).
-/// - Binds and wraps the socket in a non-blocking [`UdpSocket`].
-/// - Joins multicast groups returned by [`Service::multicast_addrs`].
-pub(crate) async fn bind_udp_sockets<S: Service>(service: &S) -> Result<Vec<UdpSocket>> {
+/// A separate socket is created for each computed bind address.
+///
+/// # Socket Options Applied
+/// - `SO_REUSEADDR`
+/// - `SO_REUSEPORT` (Linux)
+/// - `SO_BROADCAST` for IPv4 sockets
+/// - IPv6-only mode for IPv6 sockets
+/// - Optional receive-buffer sizing (Linux)
+///
+/// # Multicast Support
+/// After binding, each socket automatically joins all multicast groups
+/// returned by [`Runtime::multicast_addrs`] using the runtime’s
+/// [`NetworkInterface`].
+pub(crate) async fn bind_udp_sockets<R: Runtime>(
+    runtime: &R,
+    network_interface: Arc<NetworkInterface>,
+) -> Result<Vec<UdpSocket>> {
     let mut sockets = Vec::new();
 
-    for address in bind_addresses(service) {
-        let domain = match address {
+    for addr in bind_addresses(runtime) {
+        let domain = match addr {
             SocketAddr::V4(_) => Domain::IPV4,
             SocketAddr::V6(_) => Domain::IPV6,
         };
 
-        match Socket::new(domain, Type::DGRAM, Some(Protocol::UDP)) {
-            Ok(socket) => {
-                socket.set_reuse_address(true)?;
-                #[cfg(target_os = "linux")]
-                socket.set_reuse_port(true)?;
+        let raw = Socket::new(domain, Type::DGRAM, Some(Protocol::UDP))?;
+        raw.set_reuse_address(true)?;
+        #[cfg(target_os = "linux")]
+        raw.set_reuse_port(true)?;
 
-                if address.is_ipv6() {
-                    socket.set_only_v6(true)?;
-                } else {
-                    socket.set_broadcast(true)?;
-                }
-
-                #[cfg(target_os = "linux")]
-                if let Some(size) = udp_recvbuf_size() {
-                    socket.set_recv_buffer_size(size)?;
-                }
-
-                if let Err(e) = socket.bind(&address.into()) {
-                    error!("Failed to bind {}: {:?}", address, e);
-                    continue;
-                }
-
-                socket.set_nonblocking(true)?;
-
-                let socket = UdpSocket::from_std(socket.into())?;
-                info!("UDP service `{}` bound on {}", service.name(), address);
-
-                if !service.multicast_addrs().is_empty()
-                    && let Err(e) = join_multicast_groups(&socket, service.multicast_addrs()).await
-                {
-                    error!("Failed to join multicast groups on {}: {:?}", address, e);
-                    continue;
-                }
-
-                sockets.push(socket);
-            }
-            Err(e) => error!("Failed to create UDP socket for {}: {:?}", address, e),
+        if addr.is_ipv6() {
+            raw.set_only_v6(true)?;
+        } else {
+            raw.set_broadcast(true)?;
         }
+
+        #[cfg(target_os = "linux")]
+        if let Some(size) = udp_recvbuf_size() {
+            raw.set_recv_buffer_size(size)?;
+        }
+
+        raw.bind(&addr.into())?;
+        raw.set_nonblocking(true)?;
+
+        let socket = UdpSocket::from_std(raw.into())?;
+        info!("UDP service '{}' bound on {}", runtime.name(), addr);
+
+        let groups = runtime.multicast_addrs();
+        debug!("Runtime multicast groups: {:?}", groups);
+        if !groups.is_empty() {
+            join_multicast_groups(&socket, groups, &network_interface).await?;
+        }
+
+        sockets.push(socket);
     }
 
     if sockets.is_empty() {
         return Err(Error::new(
             ErrorKind::AddrNotAvailable,
-            format!("No valid UDP socket could be bound for {}.", service.name()),
+            format!("No valid UDP sockets bound for {}", runtime.name()),
         ));
     }
 

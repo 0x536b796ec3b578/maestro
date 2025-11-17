@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-
+//! # Maestro
 //! A unified framework for creating and managing network services.
 //!
 //! This library’s purpose is to simplify the creation, supervision, and coordination of network-based services.
@@ -10,15 +10,10 @@
 //! Simple `TCP` & `UDP` services:
 //!
 //! ```rust,no_run
-//! use async_trait::async_trait;
-//! use std::io::Result;
-//!
-//! use maestro::{NetworkInterface, RestartPolicy, Supervisor, TcpService, UdpService};
-//!
 //! pub struct MyTcpService;
 //!
 //! #[async_trait]
-//! impl TcpService for MyTcpService {
+//! impl TcpHandler for MyTcpService {
 //!     fn name(&self) -> &'static str {
 //!         "MyTcpService"
 //!     }
@@ -27,7 +22,7 @@
 //!         8080
 //!     }
 //!
-//!     async fn on_connection(&self, network_interface: &NetworkInterface, peer: &SocketAddr, mut stream: TcpStream) {
+//!     async fn on_connection(&self, stream: TcpStream, peer: &SocketAddr, network_interface: &NetworkInterface) {
 //!         unimplemented!()
 //!     }
 //! }
@@ -35,7 +30,7 @@
 //! pub struct MyUdpService;
 //!
 //! #[async_trait]
-//! impl UdpService for MyUdpService {
+//! impl UdpRuntime for MyUdpService {
 //!     fn name(&self) -> &'static str {
 //!         "MyUdpService"
 //!     }
@@ -44,7 +39,7 @@
 //!         5353
 //!     }
 //!
-//!     async fn on_packet(&self, data: &[u8], network_interface: &NetworkInterface, peer: &SocketAddr, socket: Arc<UdpSocket>) {
+//!     async fn on_packet(&self, data: &[u8], network_interface: &NetworkInterface, socket: Arc<UdpSocket>, peer: &SocketAddr) {
 //!         unimplemented!()
 //!     }
 //! }
@@ -59,16 +54,10 @@
 //! }
 //! ```
 mod network;
-mod service;
+mod runtime;
 mod supervisor;
 mod worker;
 
-pub use network::{
-    interface::NetworkInterface,
-    protocol::{Tcp, TcpHandler as TcpService, Udp, UdpHandler as UdpService},
-};
-pub use service::BindMode;
-pub use supervisor::{RestartPolicy, Supervisor};
-
-pub(crate) use service::{Service, ServiceAdapter};
-pub(crate) use worker::{Worker, WorkerService};
+pub use network::{interface::NetworkInterface, socket::bind::BindMode};
+pub use runtime::{tcp::TcpHandler, udp::UdpHandler};
+pub use supervisor::{Supervisor, policy::RestartPolicy};

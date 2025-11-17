@@ -3,14 +3,15 @@ use std::{io::Result, net::SocketAddr, sync::Arc};
 use tokio::net::{TcpListener, TcpStream};
 use tracing::{error, info};
 
-use crate::{BindMode, NetworkInterface};
+use crate::{NetworkInterface, network::socket::bind::BindMode};
 
 /// Defines the interface for handling TCP connections.
 ///
-/// A `TcpHandler` describes how a service should behave when a new
-/// TCP connection is accepted. It is automatically wrapped by
-/// [`TcpHandler`] to create a fully managed,
-/// restartable service.
+/// A `TcpHandler` describes how a runtime should behave when a new
+/// TCP connection is accepted. It is wrapped by [`TcpRuntime`]
+/// to create a fully supervised, restartable network service.
+///
+/// Users typically implement this trait for their TCP service logic.
 #[async_trait]
 pub trait TcpHandler: Send + Sync + Sized {
     /// Returns a static name for this handler (used in logs and metrics).
@@ -40,24 +41,24 @@ pub trait TcpHandler: Send + Sync + Sized {
     );
 }
 
-/// Runs a TCP service loop for the given [`TcpHandler`].
+/// Runs the connection-accept loop for a [`TcpHandler`].
 ///
 /// This function:
 /// - Binds a [`TcpListener`] to the configured address.
 /// - Accepts incoming connections in a loop.
 /// - Spawns a new asynchronous task for each connection,
 ///   invoking [`TcpHandler::on_connection`].
-pub(crate) async fn run_tcp_service<S>(
-    service: Arc<S>,
+pub(crate) async fn run_tcp_service<R>(
+    runtime: Arc<R>,
     listener: TcpListener,
     network_interface: Arc<NetworkInterface>,
 ) -> Result<()>
 where
-    S: TcpHandler + Send + Sync + Sized + 'static,
+    R: TcpHandler + Send + Sync + Sized + 'static,
 {
     info!(
         "TCP service `{}` listening on {:?}",
-        service.name(),
+        runtime.name(),
         listener.local_addr()?
     );
 
@@ -65,16 +66,16 @@ where
         let (stream, peer) = match listener.accept().await {
             Ok(connection) => connection,
             Err(e) => {
-                error!("{}: accept failed: {:?}", service.name(), e);
+                error!("{}: accept failed: {:?}", runtime.name(), e);
                 continue;
             }
         };
 
-        let service = Arc::clone(&service);
+        let runtime = Arc::clone(&runtime);
         let network_interface = Arc::clone(&network_interface);
 
         tokio::spawn(async move {
-            service
+            runtime
                 .on_connection(stream, &peer, &network_interface)
                 .await;
         });

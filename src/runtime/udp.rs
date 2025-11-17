@@ -8,16 +8,17 @@ use tokio::{net::UdpSocket, task::JoinSet};
 use tokio_util::bytes::BytesMut;
 use tracing::{error, info};
 
-use crate::BindMode;
+use crate::network::socket::bind::BindMode;
 
 const BUFFER_SIZE: usize = 512;
 
 /// Defines the interface for handling UDP packets.
 ///
-/// A `UdpHandler` processes incoming datagrams and may respond using
-/// the same socket. It is automatically wrapped by
-/// [`UdpHandler`] to form a complete, restartable
-/// network service.
+/// A `UdpHandler` processes incoming datagrams and may optionally
+/// respond using the same socket. It is wrapped by [`UdpRuntime`]
+/// to form a supervised, restartable network service.
+///
+/// Users typically implement this trait for their UDP service logic.
 #[async_trait]
 pub trait UdpHandler: Send + Sync {
     /// Returns a static name for this handler (used in logs and metrics).
@@ -46,17 +47,16 @@ pub trait UdpHandler: Send + Sync {
     /// - `data`: The received payload.
     /// - `socket`: The bound [`UdpSocket`] used to send or receive further packets.
     /// - `peer`: The remote endpoint address.
-    /// - `network_interface`: The [`NetworkInterface`] the socket belongs to.
     async fn on_packet(&self, data: &[u8], socket: Arc<UdpSocket>, peer: &SocketAddr);
 }
 
-/// Runs a UDP service loop for the given [`UdpHandler`].
+/// Runs the UDP receive loop for a [`UdpHandler`].
 ///
 /// This function:
 /// - Validates that sockets are available for binding.
 /// - Spawns a task per socket, listening for incoming packets.
 /// - Delegates processing to [`UdpHandler::on_packet`] for each datagram.
-pub(crate) async fn run_udp_service<S>(service: Arc<S>, sockets: Vec<UdpSocket>) -> Result<()>
+pub(crate) async fn run_udp_service<S>(runtime: Arc<S>, sockets: Vec<UdpSocket>) -> Result<()>
 where
     S: UdpHandler + Send + Sync + 'static,
 {
@@ -69,17 +69,16 @@ where
 
     info!(
         "UDP service `{}` listening on {} sockets",
-        service.name(),
+        runtime.name(),
         sockets.len()
     );
 
     let mut tasks = JoinSet::new();
 
     for socket in sockets {
-        let service = Arc::clone(&service);
+        let runtime = Arc::clone(&runtime);
         let socket = Arc::new(socket);
 
-        // let task = tokio::spawn(async move {
         tasks.spawn(async move {
             let mut buffer = BytesMut::with_capacity(BUFFER_SIZE);
             buffer.resize(BUFFER_SIZE, 0);
@@ -88,10 +87,10 @@ where
                 match socket.recv_from(&mut buffer).await {
                     Ok((byte_count, peer)) => {
                         let data = &buffer[..byte_count];
-                        service.on_packet(data, Arc::clone(&socket), &peer).await;
+                        runtime.on_packet(data, Arc::clone(&socket), &peer).await;
                     }
                     Err(e) => {
-                        error!("{}: recv_from failed: {:?}", service.name(), e);
+                        error!("{}: recv_from failed: {:?}", runtime.name(), e);
                         break;
                     }
                 }
