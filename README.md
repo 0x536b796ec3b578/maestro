@@ -4,7 +4,9 @@
 [![Crates.io][crates-badge]][crates-url]
 [![MIT licensed][mit-badge]][mit-url]
 
+[crates-badge]: https://img.shields.io/crates/v/maestro-rs.svg
 [crates-url]: https://crates.io/crates/maestro-rs
+[mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
 [mit-url]: https://github.com/0x536b796ec3b578/maestro/blob/main/LICENSE
 
 ## Overview
