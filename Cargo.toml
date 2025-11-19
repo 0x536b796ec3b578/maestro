@@ -5,6 +5,26 @@ authors = ["Skynõx <0x536b796ec3b578@proton.me>"]
 edition = "2024"
 repository = "https://github.com/0x536b796ec3b578/maestro"
 license = "MIT"
+description = "A lightweight, fast, and ergonomic framework for building TCP & UDP servers in Rust with zero boilerplate."
+readme = "README.md"
+keywords = [
+    "rust",
+    "networking",
+    "tcp",
+    "udp",
+    "concurrency",
+    "tokio",
+    "async",
+    "high-performance",
+    "server-framework",
+    "zero-boilerplate"
+]
+categories = [
+    "network-programming",
+    "asynchronous",
+    "concurrency",
+    "api-bindings",
+]
 
 [dependencies]
 async-trait = "0.1.89"
