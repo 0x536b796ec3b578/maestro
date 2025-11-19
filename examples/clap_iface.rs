@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use clap::{Parser, value_parser};
-use maestro::{NetworkInterface, Supervisor, TcpHandler, UdpHandler};
+use maestro_rs::{NetworkInterface, Supervisor, TcpHandler, UdpHandler};
 use std::{io::Result, net::SocketAddr, sync::Arc};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},

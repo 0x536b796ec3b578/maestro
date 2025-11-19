@@ -1,5 +1,5 @@
 [package]
-name = "maestro"
+name = "maestro-rs"
 version = "0.1.0"
 authors = ["Skynõx <0x536b796ec3b578@proton.me>"]
 edition = "2024"

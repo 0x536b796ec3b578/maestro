@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 use async_trait::async_trait;
-use maestro::{NetworkInterface, Supervisor, TcpHandler};
+use maestro_rs::{NetworkInterface, Supervisor, TcpHandler};
 use std::{io::Result, net::SocketAddr, str::FromStr};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
