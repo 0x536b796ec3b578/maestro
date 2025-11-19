@@ -8,16 +8,11 @@ license = "MIT"
 description = "A lightweight, fast, and ergonomic framework for building TCP & UDP servers in Rust with zero boilerplate."
 readme = "README.md"
 keywords = [
-    "rust",
     "networking",
     "tcp",
     "udp",
     "concurrency",
-    "tokio",
-    "async",
-    "high-performance",
-    "server-framework",
-    "zero-boilerplate"
+    "tokio"
 ]
 categories = [
     "network-programming",
