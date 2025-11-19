@@ -1,6 +1,12 @@
 # Maestro
 *A lightweight, fast, and ergonomic framework for building TCP & UDP servers in Rust with zero boilerplate.*
 
+[![Crates.io][crates-badge]][crates-url]
+[![MIT licensed][mit-badge]][mit-url]
+
+[crates-url]: https://crates.io/crates/maestro-rs
+[mit-url]: https://github.com/0x536b796ec3b578/maestro/blob/main/LICENSE
+
 ## Overview
 
 Maestro is a networking library that enables you to build high-performance concurrent TCP and UDP servers in Rust. By implementing just two lightweight traits, you can focus on your application's core logic while Maestro handles the network orchestration:
