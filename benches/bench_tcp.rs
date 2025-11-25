@@ -4,9 +4,8 @@
 //! cargo bench --bench tcp_bench -- --mode server
 //! cargo bench --bench tcp_bench -- --mode client
 
-use async_trait::async_trait;
 use clap::Parser;
-use maestro_rs::{NetworkInterface, Result, Supervisor, TcpHandler};
+use maestro_rs::{NetworkInterface, Result, Supervisor, TcpHandler, async_trait};
 use std::{
     net::SocketAddr,
     str::FromStr,

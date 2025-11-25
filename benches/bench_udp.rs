@@ -4,9 +4,8 @@
 //! cargo bench --bench udp_bench -- --mode server
 //! cargo bench --bench udp_bench -- --mode client
 
-use async_trait::async_trait;
 use clap::Parser;
-use maestro_rs::{NetworkInterface, Result, Supervisor, UdpHandler};
+use maestro_rs::{NetworkInterface, Result, Supervisor, UdpHandler, async_trait};
 use std::{
     net::SocketAddr,
     str::FromStr,
