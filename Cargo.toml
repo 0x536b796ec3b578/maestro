@@ -22,7 +22,7 @@ categories = [
 ]
 
 [features]
-default = []
+default = ["tracing"]
 tracing = ["dep:tracing"]
 
 [dependencies]
