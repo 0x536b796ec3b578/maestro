@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 
 use async_trait::async_trait;
-use maestro_rs::{NetworkInterface, Supervisor, TcpHandler};
-use std::{io::Result, net::SocketAddr, str::FromStr};
+use maestro_rs::{NetworkInterface, Result, Supervisor, TcpHandler};
+use std::{net::SocketAddr, str::FromStr};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -54,8 +54,8 @@ async fn main() -> Result<()> {
         .init();
 
     let iface = NetworkInterface::from_str("lo")?;
-
     let mut supervisor = Supervisor::new(iface);
+
     supervisor.add(EchoTcp);
     supervisor.run().await?;
 

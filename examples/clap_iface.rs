@@ -1,9 +1,8 @@
 #![forbid(unsafe_code)]
 
-use async_trait::async_trait;
 use clap::{Parser, value_parser};
-use maestro_rs::{NetworkInterface, Supervisor, TcpHandler, UdpHandler};
-use std::{io::Result, net::SocketAddr, sync::Arc};
+use maestro_rs::{NetworkInterface, Result, Supervisor, TcpHandler, UdpHandler, async_trait};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpStream, UdpSocket},
@@ -20,10 +19,6 @@ pub struct Parameters {
         value_parser = value_parser!(NetworkInterface)
     )]
     pub network_interface: NetworkInterface,
-}
-
-pub fn parse() -> Parameters {
-    Parameters::parse()
 }
 
 struct MyTcp;
@@ -82,11 +77,12 @@ async fn main() -> Result<()> {
         .with_max_level(tracing::Level::TRACE)
         .init();
 
-    let params = parse();
-
+    let params = Parameters::parse();
     let mut supervisor = Supervisor::new(params.network_interface);
+
     supervisor.add(MyTcp);
     supervisor.add(MyUdp);
+
     supervisor.run().await?;
 
     Ok(())

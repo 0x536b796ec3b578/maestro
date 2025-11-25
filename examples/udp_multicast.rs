@@ -1,9 +1,8 @@
 #![forbid(unsafe_code)]
 
 use async_trait::async_trait;
-use maestro_rs::{NetworkInterface, Supervisor, UdpHandler};
+use maestro_rs::{NetworkInterface, Result, Supervisor, UdpHandler};
 use std::{
-    io::Result,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     str::FromStr,
     sync::Arc,
