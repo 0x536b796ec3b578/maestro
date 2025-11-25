@@ -15,8 +15,8 @@ Maestro is a networking library that enables you to build high-performance concu
 - `TcpHandler`
 - `UdpHandler`
 
-In other words:
-> You compose the logic. Maestro conducts the orchestra.
+In other words: 
+You compose the logic. Maestro conducts the orchestra.
 
 ## How It Works
 
@@ -24,6 +24,13 @@ In other words:
 
 #### TCP Handler
 ```rust
+use maestro_rs::{NetworkInterface, Result, Supervisor, TcpHandler, async_trait};
+use std::{net::SocketAddr, str::FromStr};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
+
 struct MyTcpService;
 
 #[async_trait]
@@ -37,13 +44,17 @@ impl TcpHandler for MyTcpService {
     }
 
     async fn on_connection(&self, stream: TcpStream, peer: &SocketAddr) {
-        unimplemented!()
+        // Handle the connection here
     }
 }
 ```
 
 #### UDP Handler
 ```rust
+use maestro_rs::{NetworkInterface, Result, Supervisor, UdpHandler, async_trait};
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use tokio::net::UdpSocket;
+
 struct MyUdpService;
 
 #[async_trait]
@@ -57,13 +68,16 @@ impl UdpHandler for MyUdpService {
     }
 
     async fn on_packet(&self, data: &[u8], socket: Arc<UdpSocket>, peer: &SocketAddr) {
-        unimplemented!()
+        // Process the packet here
     }
 }
 ```
 
 ### Registering Services with the `Supervisor`
 ```rust
+use maestro_rs::{Supervisor, NetworkInterface, Result};
+use std::str::FromStr;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let network_interface = NetworkInterface::from_str("lo")?;
@@ -82,12 +96,12 @@ async fn main() -> Result<()> {
 
 Run the following Cargo command in your project directory:
 ```bash
-cargo add maestro
+cargo add maestro-rs
 ```
 
 Or add the following line to your `Cargo.toml`:
 ```toml
-maestro = "0.1.0"
+maestro-rs = "0.2.0"
 ```
 
 ## Contributing
@@ -114,4 +128,4 @@ If you'd like to support the project, you can donate via the following addresses
 
 ---
 
-> `Maestro` - one who conducts. Just like its name, this library orchestrates the networking layer so your application can focus on the melody of your logic.
+`Maestro` - one who conducts. Just like its name, this library orchestrates the networking layer so your application can focus on the melody of your logic.
