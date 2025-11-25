@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
+//! Run with:
+//! cargo run --example udp
 
-use async_trait::async_trait;
-use maestro_rs::{NetworkInterface, Result, Supervisor, UdpHandler};
+use maestro_rs::{NetworkInterface, Result, Supervisor, UdpHandler, async_trait};
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::net::UdpSocket;
 use tracing::{error, info};

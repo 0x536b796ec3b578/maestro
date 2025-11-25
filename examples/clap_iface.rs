@@ -1,4 +1,6 @@
 #![forbid(unsafe_code)]
+//! Run with:
+//! cargo run --example clap_iface -- -i lo
 
 use clap::{Parser, value_parser};
 use maestro_rs::{NetworkInterface, Result, Supervisor, TcpHandler, UdpHandler, async_trait};

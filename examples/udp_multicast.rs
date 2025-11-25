@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
+//! Run with:
+//! cargo run --example udp_multicast
 
-use async_trait::async_trait;
-use maestro_rs::{NetworkInterface, Result, Supervisor, UdpHandler};
+use maestro_rs::{NetworkInterface, Result, Supervisor, UdpHandler, async_trait};
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     str::FromStr,
