@@ -24,18 +24,14 @@ You compose the logic. Maestro conducts the orchestra.
 
 #### TCP Handler
 ```rust
-use maestro_rs::{NetworkInterface, Result, Supervisor, TcpHandler, async_trait};
-use std::{net::SocketAddr, str::FromStr};
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-};
+use maestro_rs::TcpHandler;
+use std::net::SocketAddr;
+use tokio::net::TcpStream;
 
 struct MyTcpService;
 
-#[async_trait]
 impl TcpHandler for MyTcpService {
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "My TCP Service"
     }
     
@@ -43,7 +39,7 @@ impl TcpHandler for MyTcpService {
         8080
     }
 
-    async fn on_connection(&self, stream: TcpStream, peer: &SocketAddr) {
+    async fn on_connection(&self, stream: TcpStream, peer: SocketAddr) {
         // Handle the connection here
     }
 }
@@ -51,15 +47,14 @@ impl TcpHandler for MyTcpService {
 
 #### UDP Handler
 ```rust
-use maestro_rs::{NetworkInterface, Result, Supervisor, UdpHandler, async_trait};
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use maestro_rs::UdpHandler;
+use std::{net::SocketAddr, sync::Arc};
 use tokio::net::UdpSocket;
 
 struct MyUdpService;
 
-#[async_trait]
 impl UdpHandler for MyUdpService {
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "My UDP Service"
     }
     
@@ -67,7 +62,7 @@ impl UdpHandler for MyUdpService {
         5353
     }
 
-    async fn on_packet(&self, data: &[u8], socket: Arc<UdpSocket>, peer: &SocketAddr) {
+    async fn on_packet(&self, data: &[u8], socket: &Arc<UdpSocket>, peer: SocketAddr) {
         // Process the packet here
     }
 }
@@ -75,12 +70,11 @@ impl UdpHandler for MyUdpService {
 
 ### Registering Services with the `Supervisor`
 ```rust
-use maestro_rs::{Supervisor, NetworkInterface, Result};
-use std::str::FromStr;
+use maestro_rs::{NetworkInterface, Result, Supervisor};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let network_interface = NetworkInterface::from_str("lo")?;
+    let network_interface = NetworkInterface::loopback()?; // or "eth0".parse()?
     let mut supervisor = Supervisor::new(network_interface);
     
     supervisor.add(MyUdpService);
@@ -101,7 +95,7 @@ cargo add maestro-rs
 
 Or add the following line to your `Cargo.toml`:
 ```toml
-maestro-rs = "0.2.0"
+maestro-rs = "0.3.0"
 ```
 
 ## Contributing
