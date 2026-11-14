@@ -1,78 +1,92 @@
-#![forbid(unsafe_code)]
-//! # Maestro
-//! `maestro` is a unified, high-performance framework for creating, supervising, and managing
-//! asynchronous network services in Rust.
+//! # maestro-rs
 //!
-//! This library’s purpose is to simplify the creation, supervision, and coordination of network-based services.
-//! It provides a structured, asynchronous foundation for managing TCP and UDP protocols, handling service lifecycles, and ensuring robust, scalable operation.
-//! By abstracting complex networking patterns, it allows developers to focus on service logic while the library handles concurrency, fault tolerance, and graceful shutdown.
+//! Supervised TCP and UDP services bound to a specific network interface.
+//!
+//! Implement [`TcpHandler`] or [`UdpHandler`] for your protocol logic, register
+//! the handlers on a [`Supervisor`] for a [`NetworkInterface`], and call
+//! [`Supervisor::run`]. Maestro takes care of:
+//!
+//! - **Binding**: to every address of the interface (including scoped IPv6
+//!   link-local addresses), to all interfaces, or to one address. See [`BindMode`].
+//! - **Concurrency**: one task per TCP connection, and UDP receive work on
+//!   every CPU core (`SO_REUSEPORT` sharding on Linux, shared sockets elsewhere).
+//! - **Portability**: Linux, macOS, Windows and BSD. See
+//!   [`NetworkInterface::loopback`] for a portable loopback interface.
+//! - **Multicast**: joining groups on the chosen interface.
+//!   See [`UdpHandler::multicast_groups`].
+//! - **Supervision**: restarting failed services with exponential backoff.
+//!   See [`RestartPolicy`].
+//! - **Shutdown**: on Ctrl+C, SIGTERM or Windows console close, or on any future you pass to
+//!   [`Supervisor::run_until`], services stop and in-flight work gets time to finish.
 //!
 //! # Example
 //!
-//! ```rust,no_run
-//! use maestro_rs::{NetworkInterface, Result, Supervisor, TcpHandler, UdpHandler, async_trait};
-//! use std::{net::SocketAddr, str::FromStr, sync::Arc};
-//! use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::{TcpStream, UdpSocket}};
-//! use tracing::{error, info};
+//! ```no_run
+//! use maestro_rs::{NetworkInterface, Result, Supervisor, TcpHandler, UdpHandler};
+//! use std::{net::SocketAddr, sync::Arc};
+//! use tokio::{
+//!     io::{AsyncReadExt, AsyncWriteExt},
+//!     net::{TcpStream, UdpSocket},
+//! };
 //!
-//! struct MyTcpService;
+//! struct Echo;
 //!
-//! #[async_trait]
-//! impl TcpHandler for MyTcpService {
-//!     fn name(&self) -> &'static str {
-//!         "MyTcpService"
-//!     }
+//! impl TcpHandler for Echo {
+//!     fn name(&self) -> &str { "tcp-echo" }
+//!     fn port(&self) -> u16 { 8080 }
 //!
-//!     fn port(&self) -> u16 {
-//!         8080
-//!     }
-//!
-//!     async fn on_connection(&self, mut stream: TcpStream, peer: &SocketAddr) {
-//!         unimplemented!()
+//!     async fn on_connection(&self, mut stream: TcpStream, _peer: SocketAddr) {
+//!         let mut buf = [0u8; 1024];
+//!         while let Ok(n @ 1..) = stream.read(&mut buf).await {
+//!             if stream.write_all(&buf[..n]).await.is_err() {
+//!                 break;
+//!             }
+//!         }
 //!     }
 //! }
 //!
-//! struct MyUdpService;
+//! impl UdpHandler for Echo {
+//!     fn name(&self) -> &str { "udp-echo" }
+//!     fn port(&self) -> u16 { 8080 }
 //!
-//! #[async_trait]
-//! impl UdpHandler for MyUdpService {
-//!     fn name(&self) -> &'static str {
-//!         "MyUdpService"
-//!     }
-//!
-//!     fn port(&self) -> u16 {
-//!         5353
-//!     }
-//!
-//!     async fn on_packet(&self, data: &[u8], socket: Arc<UdpSocket>, peer: &SocketAddr) {
-//!         unimplemented!()
+//!     async fn on_packet(&self, data: &[u8], socket: &Arc<UdpSocket>, peer: SocketAddr) {
+//!         let _ = socket.send_to(data, peer).await;
 //!     }
 //! }
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<()> {
-//!     tracing_subscriber::fmt()
-//!         .with_max_level(tracing::Level::INFO)
-//!         .init();
-//!
-//!     let iface = NetworkInterface::from_str("lo")?;
+//!     let iface = NetworkInterface::loopback()?; // or "eth0".parse()?
 //!     let mut supervisor = Supervisor::new(iface);
-//!
-//!     supervisor.add(MyUdpService);
-//!     supervisor.add(MyTcpService);
-//!
-//!     supervisor.run().await?;
-//!
-//!     Ok(())
+//!     // `Echo` implements both traits, so name the protocol explicitly.
+//!     supervisor
+//!         .add::<maestro_rs::Tcp, _>(Echo)
+//!         .add::<maestro_rs::Udp, _>(Echo);
+//!     supervisor.run().await
 //! }
 //! ```
-mod error;
-mod handler;
-mod network;
-mod supervisor;
+//!
+//! # Features
+//!
+//! - `tracing` (default): emit logs through [`tracing`](https://docs.rs/tracing).
+//!   Install a subscriber in your application to see them.
+#![cfg_attr(not(feature = "tracing"), allow(unused_variables))]
 
-pub use async_trait::async_trait;
+mod bind;
+mod error;
+mod interface;
+mod log;
+mod restart;
+mod service;
+mod supervisor;
+mod tcp;
+mod udp;
+
+pub use bind::BindMode;
 pub use error::{Error, Result};
-pub use handler::{Tcp, TcpHandler, Udp, UdpHandler};
-pub use network::{BindMode, NetworkInterface};
-pub use supervisor::{RestartPolicy, Supervisor};
+pub use interface::NetworkInterface;
+pub use restart::RestartPolicy;
+pub use service::{Service, Tcp, Udp};
+pub use supervisor::Supervisor;
+pub use tcp::TcpHandler;
+pub use udp::UdpHandler;
