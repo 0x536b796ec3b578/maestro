@@ -1,91 +1,93 @@
-#![forbid(unsafe_code)]
-//! Run with:
-//! cargo run --example clap_iface -- -i lo
+//! Choosing the interface from the command line with clap, plus a custom
+//! restart policy and both protocols on one supervisor.
+//!
+//! ```sh
+//! cargo run --example clap_iface -- --interface lo
+//! cargo run --example clap_iface -- --list
+//! ```
 
 use clap::{Parser, value_parser};
-use maestro_rs::{NetworkInterface, Result, Supervisor, TcpHandler, UdpHandler, async_trait};
-use std::{net::SocketAddr, sync::Arc};
+use maestro_rs::{NetworkInterface, RestartPolicy, Result, Supervisor, TcpHandler, UdpHandler};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpStream, UdpSocket},
 };
-use tracing::{error, info};
+use tracing::info;
 
 #[derive(Parser, Debug)]
-pub struct Parameters {
+struct Args {
     /// Network interface to bind services on.
     #[arg(
-        short = 'i',
-        long = "interface",
+        short,
+        long,
         value_name = "IFACE",
-        value_parser = value_parser!(NetworkInterface)
+        value_parser = value_parser!(NetworkInterface),
+        required_unless_present = "list"
     )]
-    pub network_interface: NetworkInterface,
+    interface: Option<NetworkInterface>,
+
+    /// List available interfaces and exit.
+    #[arg(long)]
+    list: bool,
 }
 
-struct MyTcp;
+struct EchoTcp;
 
-#[async_trait]
-impl TcpHandler for MyTcp {
-    fn name(&self) -> &'static str {
-        "CLI TCP Example"
+impl TcpHandler for EchoTcp {
+    fn name(&self) -> &str {
+        "cli-tcp"
     }
     fn port(&self) -> u16 {
         8080
     }
 
-    async fn on_connection(&self, mut stream: TcpStream, peer: &SocketAddr) {
-        info!("TCP client connected: {}", peer);
+    async fn on_connection(&self, mut stream: TcpStream, peer: SocketAddr) {
+        info!(%peer, "TCP client connected");
         let mut buf = [0u8; 1024];
-
-        loop {
-            let n = match stream.read(&mut buf).await {
-                Ok(0) => return,
-                Ok(n) => n,
-                Err(e) => {
-                    error!("TCP read failure: {:?}", e);
-                    return;
-                }
-            };
-
-            if let Err(e) = stream.write_all(&buf[..n]).await {
-                error!("TCP write failure: {:?}", e);
-                return;
+        while let Ok(n @ 1..) = stream.read(&mut buf).await {
+            if stream.write_all(&buf[..n]).await.is_err() {
+                break;
             }
         }
     }
 }
 
-struct MyUdp;
+struct AckUdp;
 
-#[async_trait]
-impl UdpHandler for MyUdp {
-    fn name(&self) -> &'static str {
-        "CLI UDP Example"
+impl UdpHandler for AckUdp {
+    fn name(&self) -> &str {
+        "cli-udp"
     }
     fn port(&self) -> u16 {
         5353
     }
 
-    async fn on_packet(&self, data: &[u8], socket: Arc<UdpSocket>, peer: &SocketAddr) {
-        info!("UDP packet from {}: {:?}", peer, data);
+    async fn on_packet(&self, data: &[u8], socket: &Arc<UdpSocket>, peer: SocketAddr) {
+        info!(%peer, len = data.len(), "UDP datagram");
         let _ = socket.send_to(b"ACK", peer).await;
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::TRACE)
-        .init();
+    tracing_subscriber::fmt().with_env_filter("debug").init();
+    let args = Args::parse();
 
-    let params = Parameters::parse();
-    let mut supervisor = Supervisor::new(params.network_interface);
+    if args.list {
+        for iface in NetworkInterface::list()? {
+            let alias = iface.alias().map(|a| format!(" ({a})")).unwrap_or_default();
+            println!("{iface}{alias}: {:?} {:?}", iface.ipv4(), iface.ipv6());
+        }
+        return Ok(());
+    }
 
-    supervisor.add(MyTcp);
-    supervisor.add(MyUdp);
-
-    supervisor.run().await?;
-
-    Ok(())
+    let iface = args
+        .interface
+        .expect("clap enforces --interface unless --list");
+    let mut supervisor = Supervisor::new(iface)
+        .with_restart_policy(RestartPolicy::default().with_unlimited_restarts())
+        .with_shutdown_timeout(Duration::from_secs(2));
+    supervisor.add(EchoTcp).add(AckUdp);
+    supervisor.run().await
 }

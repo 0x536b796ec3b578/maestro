@@ -1,94 +1,93 @@
-//! Manual Load Tester for UDP
+//! Manual UDP load test: datagrams handled per second.
 //!
-//! Run with:
-//! cargo bench --bench udp_bench -- --mode server
-//! cargo bench --bench udp_bench -- --mode client
+//! ```sh
+//! cargo run --release --example load_udp -- server
+//! cargo run --release --example load_udp -- client   # in another shell
+//! ```
 
-use clap::Parser;
-use maestro_rs::{NetworkInterface, Result, Supervisor, UdpHandler, async_trait};
+use clap::{Parser, ValueEnum};
+use maestro_rs::{NetworkInterface, Result, Supervisor, UdpHandler};
 use std::{
-    net::SocketAddr,
-    str::FromStr,
+    net::{Ipv4Addr, SocketAddr},
     sync::{
         Arc,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU64, Ordering},
     },
-    time::{Duration, Instant},
+    time::Duration,
 };
-use tokio::net::UdpSocket;
+use tokio::{net::UdpSocket, time::Instant};
+
+const PORT: u16 = 9999;
+const PAYLOAD: [u8; 64] = [0; 64];
+const DURATION: Duration = Duration::from_secs(10);
+
+#[derive(Clone, Copy, ValueEnum)]
+enum Mode {
+    Server,
+    Client,
+}
 
 #[derive(Parser)]
 struct Args {
-    #[arg(long)]
-    mode: String, // "server" or "client"
-
-    // Cargo automatically passes --bench, so we must define it to avoid parsing errors.
-    #[arg(long, hide = true)]
-    bench: bool,
+    #[arg(value_enum)]
+    mode: Mode,
 }
 
-struct BenchmarkServer {
-    counter: Arc<AtomicUsize>,
-}
+struct Counter(Arc<AtomicU64>);
 
-#[async_trait]
-impl UdpHandler for BenchmarkServer {
-    fn name(&self) -> &'static str {
-        "BenchmarkServer"
+impl UdpHandler for Counter {
+    fn name(&self) -> &str {
+        "load-udp"
     }
     fn port(&self) -> u16 {
-        9999
+        PORT
     }
 
-    async fn on_packet(&self, _data: &[u8], _sock: Arc<UdpSocket>, _peer: &SocketAddr) {
-        self.counter.fetch_add(1, Ordering::Relaxed);
+    async fn on_packet(&self, _data: &[u8], _socket: &Arc<UdpSocket>, _peer: SocketAddr) {
+        self.0.fetch_add(1, Ordering::Relaxed);
     }
+}
+
+async fn server() -> Result<()> {
+    let count = Arc::new(AtomicU64::new(0));
+    let reporter = count.clone();
+    tokio::spawn(async move {
+        let mut last = 0;
+        loop {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            let now = reporter.load(Ordering::Relaxed);
+            println!("datagrams/s: {}", now - last);
+            last = now;
+        }
+    });
+
+    let mut supervisor = Supervisor::new(NetworkInterface::loopback()?);
+    supervisor.add(Counter(count));
+    supervisor.run().await
+}
+
+async fn client() -> Result<()> {
+    let socket = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+    let target = SocketAddr::from((Ipv4Addr::LOCALHOST, PORT));
+    println!("sending to {target} for {DURATION:?}");
+
+    let deadline = Instant::now() + DURATION;
+    let mut sent = 0u64;
+    while Instant::now() < deadline {
+        // Check the clock once per batch, not per datagram.
+        for _ in 0..100 {
+            socket.send_to(&PAYLOAD, target).await?;
+        }
+        sent += 100;
+    }
+    println!("datagrams sent: {sent} ({} /s)", sent / DURATION.as_secs());
+    Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args = Args::parse();
-
-    if args.mode == "server" {
-        let counter = Arc::new(AtomicUsize::new(0));
-        let counter_clone = counter.clone();
-
-        // Stats Printer
-        tokio::spawn(async move {
-            let mut last_val = 0;
-            loop {
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                let current = counter_clone.load(Ordering::Relaxed);
-                let pps = current - last_val;
-                println!("Packets per second: {}", pps);
-                last_val = current;
-            }
-        });
-
-        let iface = NetworkInterface::from_str("lo")?;
-        let mut supervisor = Supervisor::new(iface);
-        supervisor.add(BenchmarkServer { counter });
-        supervisor.run().await?;
-    } else {
-        // Client Flooder
-        let socket = UdpSocket::bind("0.0.0.0:0").await?;
-        let target: SocketAddr = "127.0.0.1:9999".parse().unwrap();
-        println!("Flooding {} with UDP connections...", target);
-
-        let payload = vec![0u8; 64];
-        let start = Instant::now();
-        let mut count = 0;
-
-        while start.elapsed().as_secs() < 10 {
-            // Send a batch to avoid checking time too often
-            for _ in 0..100 {
-                socket.send_to(&payload, target).await?;
-                count += 1;
-            }
-        }
-
-        println!("Total packets sent: {}", count);
-        println!("Average rate: {} pp/s", count / 10);
+    match Args::parse().mode {
+        Mode::Server => server().await,
+        Mode::Client => client().await,
     }
-    Ok(())
 }
