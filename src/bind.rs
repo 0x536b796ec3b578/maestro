@@ -115,31 +115,49 @@ pub(crate) fn tcp_listener(addr: SocketAddr) -> Result<TcpListener> {
     bind().map_err(|source| Error::Bind { addr, source })
 }
 
-/// How UDP receive work is spread across cores.
+/// Number of receive loops a single shared socket runs — one per core.
+///
+/// A shared socket is the sole receiver of its traffic (a wildcard bind, a
+/// multicast group socket, or any socket on a platform without load-balancing
+/// `SO_REUSEPORT`), so its work is spread over this many concurrent loops
+/// instead of over several sockets.
+pub(crate) fn shared_workers() -> usize {
+    std::thread::available_parallelism().map_or(1, NonZeroUsize::get)
+}
+
+/// How one bound address spreads its receive work across cores.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct UdpLayout {
-    /// `SO_REUSEPORT` sockets per unicast address.
+    /// Sockets to open for the address.
     pub(crate) sockets: usize,
-    /// Receive loops per socket.
+    /// Whether those sockets form a load-balanced `SO_REUSEPORT` group.
+    pub(crate) reuse_port: bool,
+    /// Receive loops to run on each socket.
     pub(crate) workers: usize,
 }
 
-/// On Linux the kernel load-balances a reuse-port group, so there is one
-/// socket per core, each with a single receive loop. Datagrams from one peer
-/// stay on one socket and are handled in order. Elsewhere `SO_REUSEPORT`
-/// does not balance (or does not exist), so one socket is shared by one
-/// receive loop per core instead.
-pub(crate) fn udp_layout() -> UdpLayout {
-    let cores = std::thread::available_parallelism().map_or(1, NonZeroUsize::get);
-    if cfg!(target_os = "linux") {
+/// Choose the receive layout for one bound address.
+///
+/// `SO_REUSEPORT` sharding is only sound for an address that receives unicast
+/// only. The kernel load-balances a reuse-port group, so a unicast datagram
+/// reaches exactly one of its sockets and one peer's datagrams keep to a single
+/// socket, in order. Broadcast and multicast are instead *copied* to every
+/// socket in the group, so the wildcard address — the one that receives them —
+/// must stay a single socket and spread its work over several receive loops.
+/// Platforms whose `SO_REUSEPORT` does not load-balance use that same
+/// single-socket layout for every address.
+pub(crate) fn udp_layout(addr: SocketAddr) -> UdpLayout {
+    if cfg!(target_os = "linux") && !addr.ip().is_unspecified() {
         UdpLayout {
-            sockets: cores,
+            sockets: shared_workers(),
+            reuse_port: true,
             workers: 1,
         }
     } else {
         UdpLayout {
             sockets: 1,
-            workers: cores,
+            reuse_port: false,
+            workers: shared_workers(),
         }
     }
 }

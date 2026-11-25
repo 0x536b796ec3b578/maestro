@@ -1,6 +1,6 @@
 [package]
 name = "maestro-rs"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Skynõx <0x536b796ec3b578@proton.me>"]
 edition = "2024"
 rust-version = "1.85"

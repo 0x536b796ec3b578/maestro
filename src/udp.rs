@@ -83,43 +83,54 @@ pub trait UdpHandler: Send + Sync + 'static {
 }
 
 pub(crate) async fn serve<H: UdpHandler>(handler: Arc<H>, ctx: Context) -> Result<()> {
-    serve_with(handler, ctx, bind::udp_layout()).await
+    serve_with(handler, ctx, bind::udp_layout).await
 }
 
-async fn serve_with<H: UdpHandler>(
-    handler: Arc<H>,
-    ctx: Context,
-    layout: bind::UdpLayout,
-) -> Result<()> {
+async fn serve_with<H, L>(handler: Arc<H>, ctx: Context, layout: L) -> Result<()>
+where
+    H: UdpHandler,
+    L: Fn(SocketAddr) -> bind::UdpLayout,
+{
     let port = handler.port();
     let addrs = bind::unicast_addrs(handler.bind_mode(), port, &ctx.iface)?;
 
-    let mut sockets: Vec<UdpSocket> = bind::bind_each(&addrs, |addr| {
-        (0..layout.sockets)
-            .map(|_| bind::udp_socket(addr, layout.sockets > 1))
+    // Each socket is paired with the number of receive loops to run on it: a
+    // sharded reuse-port socket needs one, a single shared socket spreads its
+    // work over several. The layout is chosen per address, because only a
+    // specific unicast address may be sharded — see `bind::udp_layout`.
+    let mut sockets: Vec<(UdpSocket, usize)> = bind::bind_each(&addrs, |addr| {
+        let plan = layout(addr);
+        (0..plan.sockets)
+            .map(|_| bind::udp_socket(addr, plan.reuse_port).map(|socket| (socket, plan.workers)))
             .collect::<Result<Vec<_>>>()
     })?
     .into_iter()
     .flatten()
     .collect();
 
+    // A multicast group socket is the sole receiver of its group, so it is never
+    // sharded; it spreads its work over several receive loops like any shared
+    // socket.
     for &group in handler.multicast_groups() {
-        sockets.push(bind::multicast_socket(group, port, &ctx.iface)?);
+        let socket = bind::multicast_socket(group, port, &ctx.iface)?;
+        sockets.push((socket, bind::shared_workers()));
     }
 
+    let receive_loops: usize = sockets.iter().map(|&(_, loops)| loops).sum();
     log_info!(
         service = handler.name(),
         addrs = ?addrs,
         groups = ?handler.multicast_groups(),
         sockets = sockets.len(),
-        workers_per_socket = layout.workers,
+        receive_loops,
         interface = %ctx.iface,
         "UDP listening"
     );
 
     let mut workers = JoinSet::new();
-    for socket in sockets.into_iter().map(Arc::new) {
-        for _ in 0..layout.workers {
+    for (socket, loops) in sockets {
+        let socket = Arc::new(socket);
+        for _ in 0..loops {
             workers.spawn(recv_loop(
                 socket.clone(),
                 handler.clone(),
@@ -218,8 +229,11 @@ mod tests {
             iface: Arc::new(loopback()),
             shutdown: CancellationToken::new(),
         };
-        let layout = bind::UdpLayout {
+        // Force the shared-socket layout (one socket, several receive loops) so
+        // the test exercises concurrent service on a single socket.
+        let layout = |_: SocketAddr| bind::UdpLayout {
             sockets: 1,
+            reuse_port: false,
             workers: 4,
         };
         let server = tokio::spawn(serve_with(handler.clone(), ctx.clone(), layout));
